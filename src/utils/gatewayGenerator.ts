@@ -1343,13 +1343,6 @@ function generateWebAppApiConfig(config: GatewayConfig): string {
 
     // Create batch write connection
     if (writableVariables.length > 0) {
-      const writeBody = {
-        variables: writableVariables.reduce((acc: any, v) => {
-          acc[v.name] = v.dataType === 'boolean' ? false : v.dataType === 'string' ? '' : 0;
-          return acc;
-        }, {})
-      };
-
       const writeConnection: any = {
         id: `api-${protocol.id}-batch-write-${timestamp}`,
         name: `${protocol.name} - Batch Write`,

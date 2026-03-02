@@ -1,0 +1,44 @@
+{
+  "name": "Test Modbus Gateway",
+  "description": "Test gateway for Modbus API validation",
+  "protocols": [
+    {
+      "type": "modbus-tcp",
+      "enabled": true,
+      "mode": "server",
+      "settings": {
+        "serverPort": 5502,
+        "registerMap": {
+          "holdingRegisters": {
+            "count": 10,
+            "variables": [
+              {"name": "temperature", "address": 0, "dataType": "int16", "description": "Temperature sensor"},
+              {"name": "pressure", "address": 1, "dataType": "int16", "description": "Pressure sensor"},
+              {"name": "flow_rate", "address": 2, "dataType": "int16", "description": "Flow rate"},
+              {"name": "level", "address": 3, "dataType": "int16", "description": "Tank level"},
+              {"name": "speed", "address": 4, "dataType": "int16", "description": "Motor speed"}
+            ]
+          },
+          "coils": {
+            "count": 8,
+            "variables": [
+              {"name": "pump_on", "address": 0, "dataType": "boolean", "description": "Pump control"},
+              {"name": "valve_open", "address": 1, "dataType": "boolean", "description": "Valve control"},
+              {"name": "heater_on", "address": 2, "dataType": "boolean", "description": "Heater control"},
+              {"name": "alarm_active", "address": 3, "dataType": "boolean", "description": "Alarm status"}
+            ]
+          },
+          "discreteInputs": {
+            "count": 5,
+            "variables": []
+          },
+          "inputRegisters": {
+            "count": 5,
+            "variables": []
+          }
+        }
+      }
+    }
+  ],
+  "apiPort": 8080
+}

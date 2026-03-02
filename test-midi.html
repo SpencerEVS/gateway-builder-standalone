@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Device Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .message {
+            margin: 5px 0;
+        }
+        .device-list {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .device-item {
+            padding: 5px;
+            margin: 5px 0;
+            background: white;
+            border-left: 3px solid #007bff;
+            padding-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MIDI Device Test</h1>
+        <p>Test your MIDI USB device connectivity and read MIDI messages.</p>
+        
+        <div>
+            <button id="requestAccess">Request MIDI Access</button>
+            <button id="clearOutput">Clear Output</button>
+        </div>
+        
+        <div id="deviceInfo" class="device-list"></div>
+        
+        <div id="output"></div>
+    </div>
+
+    <script>
+        let midiAccess = null;
+        const output = document.getElementById('output');
+        const deviceInfo = document.getElementById('deviceInfo');
+        
+        function log(message, color = '#0f0') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.style.color = color;
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(messageDiv);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function displayDevices() {
+            if (!midiAccess) return;
+            
+            deviceInfo.innerHTML = '<h3>Available MIDI Devices:</h3>';
+            
+            // List Input Devices
+            const inputs = Array.from(midiAccess.inputs.values());
+            if (inputs.length > 0) {
+                deviceInfo.innerHTML += '<h4>Input Devices:</h4>';
+                inputs.forEach((input, index) => {
+                    const deviceDiv = document.createElement('div');
+                    deviceDiv.className = 'device-item';
+                    deviceDiv.innerHTML = `
+                        <strong>${input.name}</strong><br>
+                        Manufacturer: ${input.manufacturer || 'Unknown'}<br>
+                        ID: ${input.id}
+                    `;
+                    deviceInfo.appendChild(deviceDiv);
+                });
+            } else {
+                deviceInfo.innerHTML += '<p>No MIDI input devices found.</p>';
+            }
+            
+            // List Output Devices
+            const outputs = Array.from(midiAccess.outputs.values());
+            if (outputs.length > 0) {
+                deviceInfo.innerHTML += '<h4>Output Devices:</h4>';
+                outputs.forEach((output, index) => {
+                    const deviceDiv = document.createElement('div');
+                    deviceDiv.className = 'device-item';
+                    deviceDiv.innerHTML = `
+                        <strong>${output.name}</strong><br>
+                        Manufacturer: ${output.manufacturer || 'Unknown'}<br>
+                        ID: ${output.id}
+                    `;
+                    deviceInfo.appendChild(deviceDiv);
+                });
+            }
+        }
+
+        function onMIDIMessage(event) {
+            const [command, note, velocity] = event.data;
+            
+            // Decode MIDI message type
+            const messageType = command & 0xf0;
+            const channel = (command & 0x0f) + 1;
+            
+            let messageDescription = '';
+            switch(messageType) {
+                case 0x80:
+                    messageDescription = `Note OFF - Channel: ${channel}, Note: ${note}, Velocity: ${velocity}`;
+                    break;
+                case 0x90:
+                    if (velocity === 0) {
+                        messageDescription = `Note OFF - Channel: ${channel}, Note: ${note}`;
+                    } else {
+                        messageDescription = `Note ON - Channel: ${channel}, Note: ${note}, Velocity: ${velocity}`;
+                    }
+                    break;
+                case 0xA0:
+                    messageDescription = `Polyphonic Aftertouch - Channel: ${channel}, Note: ${note}, Pressure: ${velocity}`;
+                    break;
+                case 0xB0:
+                    messageDescription = `Control Change - Channel: ${channel}, Controller: ${note}, Value: ${velocity}`;
+                    break;
+                case 0xC0:
+                    messageDescription = `Program Change - Channel: ${channel}, Program: ${note}`;
+                    break;
+                case 0xD0:
+                    messageDescription = `Channel Aftertouch - Channel: ${channel}, Pressure: ${note}`;
+                    break;
+                case 0xE0:
+                    const pitchBend = (velocity << 7) | note;
+                    messageDescription = `Pitch Bend - Channel: ${channel}, Value: ${pitchBend}`;
+                    break;
+                default:
+                    messageDescription = `Unknown - Raw: [${event.data.join(', ')}]`;
+            }
+            
+            log(messageDescription, '#00ff00');
+        }
+
+        function onMIDISuccess(midi) {
+            midiAccess = midi;
+            log('MIDI Access Granted!', '#00ff00');
+            log(`Found ${midi.inputs.size} input device(s) and ${midi.outputs.size} output device(s)`, '#00aaff');
+            
+            displayDevices();
+            
+            // Set up listeners for all inputs
+            for (let input of midi.inputs.values()) {
+                input.onmidimessage = onMIDIMessage;
+                log(`Listening to: ${input.name}`, '#ffaa00');
+            }
+            
+            // Listen for device connect/disconnect
+            midi.onstatechange = (event) => {
+                log(`Device ${event.port.state}: ${event.port.name}`, '#ff00ff');
+                displayDevices();
+            };
+            
+            log('Ready to receive MIDI messages. Try playing something on your device!', '#00aaff');
+        }
+
+        function onMIDIFailure(error) {
+            log(`Failed to get MIDI access: ${error}`, '#ff0000');
+            log('Make sure you granted permission and your browser supports Web MIDI API.', '#ff0000');
+        }
+
+        document.getElementById('requestAccess').addEventListener('click', () => {
+            log('Requesting MIDI access...', '#ffaa00');
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess({ sysex: true })
+                    .then(onMIDISuccess, onMIDIFailure);
+            } else {
+                log('Web MIDI API not supported in this browser.', '#ff0000');
+                log('Try using Chrome, Edge, or Opera.', '#ff0000');
+            }
+        });
+
+        document.getElementById('clearOutput').addEventListener('click', () => {
+            output.innerHTML = '';
+        });
+
+        // Auto-request on load
+        log('Click "Request MIDI Access" to begin...', '#00aaff');
+    </script>
+</body>
+</html>
